@@ -100,7 +100,7 @@ class ROSData(object):
     Subscriber to ROS topic that buffers incoming data
     """
 
-    def __init__(self, topic, start_time, bag, start, end):
+    def __init__(self, topic, start_time, start, end):
         self.start = start
         self.end = end
         self.name = topic
@@ -110,9 +110,6 @@ class ROSData(object):
         self.lock = threading.Lock()
         self.buff_x = []
         self.buff_y = []
-
-        if bag is not None:
-            self.load_data(bag)
 
     def close(self):
         pass
@@ -129,26 +126,14 @@ class ROSData(object):
         else:
             self.error = RosPlotException("Can not resolve topic type of %s" % topic)
 
-        try:
-            locked = False
-            n = 0
-            for topic, msg, t in bag.read_messages(start_time=rospy.Time(self.start), end_time=rospy.Time(self.end), topics=[real_topic]):
-                if not locked:
-                    self.lock.acquire()
-                    locked = True
-
+        for topic, msg, t in bag.read_messages(start_time=rospy.Time(self.start), end_time=rospy.Time(self.end), topics=[real_topic]):
+            try:
+                self.lock.acquire()
                 self.buff_y.append(self._get_data(msg))
                 self.buff_x.append(t.to_sec() - self.start_time)
-
-                n += 1
-                if n > 100:
-                    self.lock.release()
-                    locked = False
-                    n = 0
-
-        finally:
-            if locked:
+            finally:
                 self.lock.release()
+
         rospy.loginfo("Done reading")
 
     def _ros_cb(self, msg):

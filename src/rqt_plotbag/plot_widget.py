@@ -32,12 +32,13 @@
 
 import os
 import time
+import threading
 
 import rospkg
 import roslib
 
 from python_qt_binding import loadUi
-from python_qt_binding.QtCore import Qt, QTimer, qWarning, Slot, QDateTime
+from python_qt_binding.QtCore import Qt, QTimer, qWarning, Slot, QDateTime, pyqtSignal
 from python_qt_binding.QtGui import QIcon
 from python_qt_binding.QtWidgets import QAction, QMenu, QWidget, QFileDialog
 
@@ -180,7 +181,10 @@ def is_plottable(topic_name, bag):
     return len(fields) > 0, message
 
 class PlotWidget(QWidget):
-    _redraw_interval = 40
+    _redraw_interval = 200
+
+    load_done_sig = pyqtSignal()
+    draw_done_sig = pyqtSignal()
 
     def __init__(self, initial_topics=None, start_paused=False):
         super(PlotWidget, self).__init__()
@@ -213,7 +217,16 @@ class PlotWidget(QWidget):
         self._update_plot_timer = QTimer(self)
         self._update_plot_timer.timeout.connect(self.update_plot)
 
+        self.load_done_sig.connect(self.load_done)
+        self.draw_done_sig.connect(self.draw_done)
+
         self._bag = None
+        self.set_status()
+
+    def set_status(self, msg=""):
+        self.subscribe_topic_button.setEnabled(msg == "")
+        self.status_label.setText(msg)
+
 
     def switch_data_plot_widget(self, data_plot):
         self.enable_timer(enabled=False)
@@ -323,6 +336,12 @@ class PlotWidget(QWidget):
 
     @Slot()
     def on_load_button_clicked(self):
+        thread = threading.Thread(target=self._load, args=())
+        thread.daemon = True
+        thread.start()
+        self.set_status("LOADING")
+
+    def _load(self):
         bagfile = self.bag_edit.text()
         rospy.loginfo("Loading bag file %s" % bagfile)
         self._bag = rosbag.Bag(bagfile)
@@ -330,6 +349,10 @@ class PlotWidget(QWidget):
         self._bag.all_topics_types = [(k, v.msg_type) for k, v in self._bag.get_type_and_topic_info()[1].items()]
         self._bag.all_topics = [k for k, v in self._bag.all_topics_types]
         rospy.loginfo("Topics read")
+        self.load_done_sig.emit()
+
+    def load_done(self):
+        self.set_status("")
         self.start_time_edit.setDateTime(QDateTime.fromMSecsSinceEpoch(self._bag.get_start_time() * 1000))
         self.end_time_edit.setDateTime(QDateTime.fromMSecsSinceEpoch(self._bag.get_end_time() * 1000))
         self._start_time = self.get_times()[0]
@@ -337,6 +360,12 @@ class PlotWidget(QWidget):
     @Slot()
     def on_redraw_button_clicked(self):
         self.clear_plot()
+        thread = threading.Thread(target=self._redraw, args=())
+        thread.daemon = True
+        thread.start()
+        self.set_status("REDRAWING")
+
+    def _redraw(self):
         start, end = self.get_times()
         self._start_time = start
         for topic, data in self._rosdata.items():
@@ -344,6 +373,11 @@ class PlotWidget(QWidget):
             data.start = start
             data.end = end
             data.load_data(self._bag)
+
+        self.draw_done_sig.emit()
+
+    def draw_done(self):
+        self.set_status()
 
     def get_times(self):
         """ Returns time inputs in unix time"""
@@ -396,7 +430,8 @@ class PlotWidget(QWidget):
                 qWarning('PlotWidget.add_topic(): topic already subscribed: %s' % topic_name)
                 continue
             start, end = self.get_times()
-            self._rosdata[topic_name] = ROSData(topic_name, self._start_time, self._bag, start, end)
+            self._rosdata[topic_name] = ROSData(topic_name, self._start_time, start, end)
+            self.load_topic_data(topic_name)
             if self._rosdata[topic_name].error is not None:
                 qWarning(str(self._rosdata[topic_name].error))
                 del self._rosdata[topic_name]
@@ -407,6 +442,16 @@ class PlotWidget(QWidget):
 
         if topics_changed:
             self._subscribed_topics_changed()
+
+    def load_topic_data(self, topic_name):
+        self.set_status("READING")
+        thread = threading.Thread(target=self._load_topic_data, args=(topic_name,))
+        thread.daemon = True
+        thread.start()
+
+    def _load_topic_data(self, topic_name):
+        self._rosdata[topic_name].load_data(self._bag)
+        self.draw_done_sig.emit()
 
     def remove_topic(self, topic_name):
         self._rosdata[topic_name].close()
