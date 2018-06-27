@@ -42,10 +42,10 @@ from .plot_widget import PlotWidget
 
 from .data_plot import DataPlot
 
-class Plot(Plugin):
+class Plotbag(Plugin):
 
     def __init__(self, context):
-        super(Plot, self).__init__(context)
+        super(Plotbag, self).__init__(context)
         self.setObjectName('Plot')
 
         self._context = context
@@ -65,8 +65,8 @@ class Plot(Plugin):
         context.add_widget(self._widget)
 
     def _parse_args(self, argv):
-        parser = argparse.ArgumentParser(prog='rqt_plot', add_help=False)
-        Plot.add_arguments(parser)
+        parser = argparse.ArgumentParser(prog='rqt_plotbag', add_help=False)
+        Plotbag.add_arguments(parser)
         args = parser.parse_args(argv)
 
         # convert topic arguments into topic names
@@ -92,7 +92,7 @@ class Plot(Plugin):
                     c_topics.append(sub_t)
             # #1053: resolve command-line topic names
             import rosgraph
-            c_topics = [rosgraph.names.script_resolve_name('rqt_plot', n) for n in c_topics]
+            c_topics = [rosgraph.names.script_resolve_name('rqt_plotbag', n) for n in c_topics]
             if type(c_topics) == list:
                 topic_list.extend(c_topics)
             else:
@@ -103,7 +103,7 @@ class Plot(Plugin):
 
     @staticmethod
     def add_arguments(parser):
-        group = parser.add_argument_group('Options for rqt_plot plugin')
+        group = parser.add_argument_group('Options for rqt_plotbag plugin')
         group.add_argument('-P', '--pause', action='store_true', dest='start_paused',
             help='Start in paused state')
         group.add_argument('-e', '--empty', action='store_true', dest='start_empty',
@@ -127,11 +127,11 @@ class Plot(Plugin):
 
         self._update_title()
 
-        if len(self._widget._rosdata.keys()) == 0 and not self._args.start_empty:
-            topics = unpack(instance_settings.value('topics', []))
-            if topics:
-                for topic in topics:
-                    self._widget.add_topic(topic)
+        # if len(self._widget._rosdata.keys()) == 0 and not self._args.start_empty:
+        #     topics = unpack(instance_settings.value('topics', []))
+        #     if topics:
+        #         for topic in topics:
+        #             self._widget.add_topic(topic)
 
         self._data_plot.restore_settings(plugin_settings, instance_settings)
 

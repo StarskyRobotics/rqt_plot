@@ -37,7 +37,7 @@ import sys
 
 from python_qt_binding.QtCore import QEvent, QSize, QPointF, Qt, Signal, Slot, qWarning
 from python_qt_binding.QtGui import QColor, QPen, QBrush, QVector2D
-import Qwt
+import qwt as Qwt
 
 from numpy import arange, zeros, concatenate
 

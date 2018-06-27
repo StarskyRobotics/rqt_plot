@@ -48,8 +48,10 @@ from std_msgs.msg import Bool
 class RosPlotException(Exception):
     pass
 
+def _get_all_topics(bag):
+    return bag.get_type_and_topic_info()[1].keys()
 
-def _get_topic_type(topic):
+def _get_topic_type(topic, bag):
     """
     subroutine for getting the topic type
     (nearly identical to rostopic._get_topic_type, except it returns rest of name instead of fn)
@@ -57,31 +59,36 @@ def _get_topic_type(topic):
     :returns: topic type, real topic name, and rest of name referenced
       if the topic points to a field within a topic, e.g. /rosout/msg, ``str, str, str``
     """
-    try:
-        master = rosgraph.Master('/rosplot')
-        val = master.getTopicTypes()
-    except:
-        raise RosPlotException("unable to get list of topics from master")
-    matches = [(t, t_type) for t, t_type in val if t == topic or topic.startswith(t + '/')]
-    if matches:
-        t, t_type = matches[0]
-        if t_type == roslib.names.ANYTYPE:
-            return None, None, None
-        if t_type == topic:
-            return t_type, None
-        return t_type, t, topic[len(t):]
-    else:
-        return None, None, None
+    topics = _get_all_topics(bag)
+    for t in topics:
+        if t == topic:
+            return "dummy", t, ""
+    for t in topics:
+        if topic.startswith(t + '/'):
+            return "dummy", t, topic[len(t):]
+
+    return None, None, None
+
+    # matches = [(t, t_type) for t, t_type in val if t == topic or topic.startswith(t + '/')]
+    # if matches:
+    #     t, t_type = matches[0]
+    #     if t_type == roslib.names.ANYTYPE:
+    #         return None, None, None
+    #     if t_type == topic:
+    #         return t_type, None
+    #     return t_type, t, topic[len(t):]
+    # else:
+    #     return None, None, None
 
 
-def get_topic_type(topic):
+def get_topic_type(topic, bag):
     """
     Get the topic type (nearly identical to rostopic.get_topic_type, except it doesn't return a fn)
 
     :returns: topic type, real topic name, and rest of name referenced
       if the \a topic points to a field within a topic, e.g. /rosout/msg, ``str, str, str``
     """
-    topic_type, real_topic, rest = _get_topic_type(topic)
+    topic_type, real_topic, rest = _get_topic_type(topic, bag)
     if topic_type:
         return topic_type, real_topic, rest
     else:
@@ -93,7 +100,7 @@ class ROSData(object):
     Subscriber to ROS topic that buffers incoming data
     """
 
-    def __init__(self, topic, start_time):
+    def __init__(self, topic, start_time, bag):
         self.name = topic
         self.start_time = start_time
         self.error = None
@@ -102,16 +109,30 @@ class ROSData(object):
         self.buff_x = []
         self.buff_y = []
 
-        topic_type, real_topic, fields = get_topic_type(topic)
+        if bag is not None:
+            self.load_data(bag)
+
+    def close(self):
+        pass
+        #self.sub.unregister()
+
+    def load_data(self, bag):
+        print("Checking topic")
+        topic = self.name
+        topic_type, real_topic, fields = get_topic_type(topic, bag)
         if topic_type is not None:
             self.field_evals = generate_field_evals(fields)
-            data_class = roslib.message.get_message_class(topic_type)
-            self.sub = rospy.Subscriber(real_topic, data_class, self._ros_cb)
+            #data_class = roslib.message.get_message_class(topic_type)
+            #self.sub = rospy.Subscriber(real_topic, data_class, self._ros_cb)
         else:
             self.error = RosPlotException("Can not resolve topic type of %s" % topic)
 
-    def close(self):
-        self.sub.unregister()
+        print("%s -> %s"%(topic, real_topic))
+        self.buff_x = []
+        self.buff_y = []
+        for topic, msg, t in bag.read_messages(topics=[real_topic]):
+            self.buff_y.append(self._get_data(msg))
+            self.buff_x.append(t.to_sec() - self.start_time)
 
     def _ros_cb(self, msg):
         """
@@ -153,6 +174,7 @@ class ROSData(object):
 
     def _get_data(self, msg):
         val = msg
+        #print(val)
         try:
             if not self.field_evals:
                 if isinstance(val, Bool):
@@ -161,6 +183,7 @@ class ROSData(object):
                 return float(val)
             for f in self.field_evals:
                 val = f(val)
+                #print(val)
             return float(val)
         except IndexError:
             self.error = RosPlotException("[%s] index error for: %s" % (self.name, str(val).replace('\n', ', ')))

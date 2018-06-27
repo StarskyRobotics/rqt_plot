@@ -1,5 +1,5 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Changelog for package rqt_plot
+Changelog for package rqt_plotbag
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 0.4.8 (2017-04-24)

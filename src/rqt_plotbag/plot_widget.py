@@ -37,18 +37,84 @@ import roslib
 from python_qt_binding import loadUi
 from python_qt_binding.QtCore import Qt, QTimer, qWarning, Slot
 from python_qt_binding.QtGui import QIcon
-from python_qt_binding.QtWidgets import QAction, QMenu, QWidget
+from python_qt_binding.QtWidgets import QAction, QMenu, QWidget, QFileDialog
 
 import rospy
+import rosbag
 
 from rqt_py_common.topic_completer import TopicCompleter
 from rqt_py_common import topic_helpers
+from std_msgs.msg import Bool
 
 from . rosplot import ROSData, RosPlotException
 from .data_plot import DataPlot
 
-def get_plot_fields(topic_name):
-    topic_type, real_topic, _ = topic_helpers.get_topic_type(topic_name)
+def _get_all_topics(bag):
+    if bag is None:
+        return []
+    return [(k, v.msg_type) for k, v in bag.get_type_and_topic_info()[1].items()]
+
+def _get_topic_type(topic, bag):
+    """
+    subroutine for getting the topic type
+    (nearly identical to rostopic._get_topic_type, except it returns rest of name instead of fn)
+
+    :returns: topic type, real topic name, and rest of name referenced
+      if the topic points to a field within a topic, e.g. /rosout/msg, ``str, str, str``
+    """
+    topics = _get_all_topics(bag)
+    for t, ttype in topics:
+        if t == topic:
+            return ttype, t, ""
+    for t, ttype in topics:
+        if topic.startswith(t + '/'):
+            return ttype, t, topic[len(t):]
+
+    return None, None, None
+
+    # matches = [(t, t_type) for t, t_type in val if t == topic or topic.startswith(t + '/')]
+    # if matches:
+    #     t, t_type = matches[0]
+    #     if t_type == roslib.names.ANYTYPE:
+    #         return None, None, None
+    #     if t_type == topic:
+    #         return t_type, None
+    #     return t_type, t, topic[len(t):]
+    # else:
+    #     return None, None, None
+
+
+def get_topic_type(topic, bag):
+    """
+    Get the topic type (nearly identical to rostopic.get_topic_type, except it doesn't return a fn)
+
+    :returns: topic type, real topic name, and rest of name referenced
+      if the \a topic points to a field within a topic, e.g. /rosout/msg, ``str, str, str``
+    """
+    topic_type, real_topic, rest = _get_topic_type(topic, bag)
+    if topic_type:
+        return topic_type, real_topic, rest
+    else:
+        return None, None, None
+
+
+def update_topics(self, bag):
+    self.model().clear()
+    if bag is None:
+        return
+    topic_list = _get_all_topics(bag)
+    for topic_path, topic_type in topic_list:
+        topic_name = topic_path.strip('/')
+        message_class = roslib.message.get_message_class(topic_type)
+        if message_class is None:
+            qWarning('TopicCompleter.update_topics(): could not get message class for topic type "%s" on topic "%s"' % (
+            topic_type, topic_path))
+            continue
+        message_instance = message_class()
+        self.model().add_message(message_instance, topic_name, topic_type, topic_path)
+
+def get_plot_fields(topic_name, bag):
+    topic_type, real_topic, _ = get_topic_type(topic_name, bag)
     if topic_type is None:
         message = "topic %s does not exist" % ( topic_name )
         return [], message
@@ -107,8 +173,8 @@ def get_plot_fields(topic_name):
             message = "Topic %s is not numeric" % ( topic_name )
             return [], message
 
-def is_plottable(topic_name):
-    fields, message = get_plot_fields(topic_name)
+def is_plottable(topic_name, bag):
+    fields, message = get_plot_fields(topic_name, bag)
     return len(fields) > 0, message
 
 class PlotWidget(QWidget):
@@ -121,7 +187,7 @@ class PlotWidget(QWidget):
         self._initial_topics = initial_topics
 
         rp = rospkg.RosPack()
-        ui_file = os.path.join(rp.get_path('rqt_plot'), 'resource', 'plot.ui')
+        ui_file = os.path.join(rp.get_path('rqt_plotbag'), 'resource', 'plot.ui')
         loadUi(ui_file, self)
         self.subscribe_topic_button.setIcon(QIcon.fromTheme('list-add'))
         self.remove_topic_button.setIcon(QIcon.fromTheme('list-remove'))
@@ -129,12 +195,12 @@ class PlotWidget(QWidget):
         self.clear_button.setIcon(QIcon.fromTheme('edit-clear'))
         self.data_plot = None
 
-        self.subscribe_topic_button.setEnabled(False)
+        self.subscribe_topic_button.setEnabled(True)
         if start_paused:
             self.pause_button.setChecked(True)
 
         self._topic_completer = TopicCompleter(self.topic_edit)
-        self._topic_completer.update_topics()
+        update_topics(self._topic_completer, None)
         self.topic_edit.setCompleter(self._topic_completer)
 
         self._start_time = rospy.get_time()
@@ -144,6 +210,8 @@ class PlotWidget(QWidget):
         # init and start update timer for plot
         self._update_plot_timer = QTimer(self)
         self._update_plot_timer.timeout.connect(self.update_plot)
+
+        self._bag = None
 
     def switch_data_plot_widget(self, data_plot):
         self.enable_timer(enabled=False)
@@ -191,7 +259,7 @@ class PlotWidget(QWidget):
             topic_name = str(event.mimeData().text())
 
         # check for plottable field type
-        plottable, message = is_plottable(topic_name)
+        plottable, message = is_plottable(topic_name, self._bag)
         if plottable:
             event.acceptProposedAction()
         else:
@@ -210,9 +278,9 @@ class PlotWidget(QWidget):
     def on_topic_edit_textChanged(self, topic_name):
         # on empty topic name, update topics
         if topic_name in ('', '/'):
-            self._topic_completer.update_topics()
+            update_topics(self._topic_completer, self._bag)
 
-        plottable, message = is_plottable(topic_name)
+        plottable, message = is_plottable(topic_name, self._bag)
         self.subscribe_topic_button.setEnabled(plottable)
         self.subscribe_topic_button.setToolTip(message)
 
@@ -246,6 +314,17 @@ class PlotWidget(QWidget):
     @Slot()
     def on_clear_button_clicked(self):
         self.clear_plot()
+
+    @Slot()
+    def on_browse_button_clicked(self):
+        self.bag_edit.setText(QFileDialog.getOpenFileName()[0])
+
+    @Slot()
+    def on_load_button_clicked(self):
+        bagfile = self.bag_edit.text()
+        rospy.loginfo("Loading bag file %s" % bagfile)
+        self._bag = rosbag.Bag(bagfile)
+        print("Bag loaded")
 
     def update_plot(self):
         if self.data_plot is not None:
@@ -287,11 +366,11 @@ class PlotWidget(QWidget):
 
     def add_topic(self, topic_name):
         topics_changed = False
-        for topic_name in get_plot_fields(topic_name)[0]:
+        for topic_name in get_plot_fields(topic_name, self._bag)[0]:
             if topic_name in self._rosdata:
                 qWarning('PlotWidget.add_topic(): topic already subscribed: %s' % topic_name)
                 continue
-            self._rosdata[topic_name] = ROSData(topic_name, self._start_time)
+            self._rosdata[topic_name] = ROSData(topic_name, self._start_time, self._bag)
             if self._rosdata[topic_name].error is not None:
                 qWarning(str(self._rosdata[topic_name].error))
                 del self._rosdata[topic_name]
