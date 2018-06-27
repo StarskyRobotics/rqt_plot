@@ -49,7 +49,7 @@ class RosPlotException(Exception):
     pass
 
 def _get_all_topics(bag):
-    return bag.get_type_and_topic_info()[1].keys()
+    return bag.all_topics
 
 def _get_topic_type(topic, bag):
     """
@@ -100,7 +100,9 @@ class ROSData(object):
     Subscriber to ROS topic that buffers incoming data
     """
 
-    def __init__(self, topic, start_time, bag):
+    def __init__(self, topic, start_time, bag, start, end):
+        self.start = start
+        self.end = end
         self.name = topic
         self.start_time = start_time
         self.error = None
@@ -117,8 +119,8 @@ class ROSData(object):
         #self.sub.unregister()
 
     def load_data(self, bag):
-        print("Checking topic")
         topic = self.name
+        rospy.loginfo("Reading %s"%topic)
         topic_type, real_topic, fields = get_topic_type(topic, bag)
         if topic_type is not None:
             self.field_evals = generate_field_evals(fields)
@@ -127,12 +129,27 @@ class ROSData(object):
         else:
             self.error = RosPlotException("Can not resolve topic type of %s" % topic)
 
-        print("%s -> %s"%(topic, real_topic))
-        self.buff_x = []
-        self.buff_y = []
-        for topic, msg, t in bag.read_messages(topics=[real_topic]):
-            self.buff_y.append(self._get_data(msg))
-            self.buff_x.append(t.to_sec() - self.start_time)
+        try:
+            locked = False
+            n = 0
+            for topic, msg, t in bag.read_messages(start_time=rospy.Time(self.start), end_time=rospy.Time(self.end), topics=[real_topic]):
+                if not locked:
+                    self.lock.acquire()
+                    locked = True
+
+                self.buff_y.append(self._get_data(msg))
+                self.buff_x.append(t.to_sec() - self.start_time)
+
+                n += 1
+                if n > 100:
+                    self.lock.release()
+                    locked = False
+                    n = 0
+
+        finally:
+            if locked:
+                self.lock.release()
+        rospy.loginfo("Done reading")
 
     def _ros_cb(self, msg):
         """

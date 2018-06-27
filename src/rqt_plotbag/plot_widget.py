@@ -31,11 +31,13 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import time
+
 import rospkg
 import roslib
 
 from python_qt_binding import loadUi
-from python_qt_binding.QtCore import Qt, QTimer, qWarning, Slot
+from python_qt_binding.QtCore import Qt, QTimer, qWarning, Slot, QDateTime
 from python_qt_binding.QtGui import QIcon
 from python_qt_binding.QtWidgets import QAction, QMenu, QWidget, QFileDialog
 
@@ -52,7 +54,7 @@ from .data_plot import DataPlot
 def _get_all_topics(bag):
     if bag is None:
         return []
-    return [(k, v.msg_type) for k, v in bag.get_type_and_topic_info()[1].items()]
+    return bag.all_topics_types
 
 def _get_topic_type(topic, bag):
     """
@@ -324,7 +326,30 @@ class PlotWidget(QWidget):
         bagfile = self.bag_edit.text()
         rospy.loginfo("Loading bag file %s" % bagfile)
         self._bag = rosbag.Bag(bagfile)
-        print("Bag loaded")
+        rospy.loginfo("Bag loaded, reading topics")
+        self._bag.all_topics_types = [(k, v.msg_type) for k, v in self._bag.get_type_and_topic_info()[1].items()]
+        self._bag.all_topics = [k for k, v in self._bag.all_topics_types]
+        rospy.loginfo("Topics read")
+        self.start_time_edit.setDateTime(QDateTime.fromMSecsSinceEpoch(self._bag.get_start_time() * 1000))
+        self.end_time_edit.setDateTime(QDateTime.fromMSecsSinceEpoch(self._bag.get_end_time() * 1000))
+        self._start_time = self.get_times()[0]
+
+    @Slot()
+    def on_redraw_button_clicked(self):
+        self.clear_plot()
+        start, end = self.get_times()
+        self._start_time = start
+        for topic, data in self._rosdata.items():
+            data.start_time = start
+            data.start = start
+            data.end = end
+            data.load_data(self._bag)
+
+    def get_times(self):
+        """ Returns time inputs in unix time"""
+        start = time.mktime(self.start_time_edit.dateTime().toPyDateTime().timetuple())
+        end = time.mktime(self.end_time_edit.dateTime().toPyDateTime().timetuple())
+        return start, end
 
     def update_plot(self):
         if self.data_plot is not None:
@@ -370,7 +395,8 @@ class PlotWidget(QWidget):
             if topic_name in self._rosdata:
                 qWarning('PlotWidget.add_topic(): topic already subscribed: %s' % topic_name)
                 continue
-            self._rosdata[topic_name] = ROSData(topic_name, self._start_time, self._bag)
+            start, end = self.get_times()
+            self._rosdata[topic_name] = ROSData(topic_name, self._start_time, self._bag, start, end)
             if self._rosdata[topic_name].error is not None:
                 qWarning(str(self._rosdata[topic_name].error))
                 del self._rosdata[topic_name]
