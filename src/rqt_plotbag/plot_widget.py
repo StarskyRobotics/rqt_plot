@@ -31,6 +31,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import os
+from collections import defaultdict
+
 import time
 import threading
 
@@ -368,11 +370,17 @@ class PlotWidget(QWidget):
     def _redraw(self):
         start, end = self.get_times()
         self._start_time = start
+        real_topics = defaultdict(list)
         for topic, data in self._rosdata.items():
+            real_topics[data.real_topic] += [data]
             data.start_time = start
             data.start = start
             data.end = end
-            data.load_data(self._bag)
+
+        for topic, msg, t in self._bag.read_messages(start_time=rospy.Time(start), end_time=rospy.Time(end),
+                                               topics=real_topics.keys()):
+            for data in real_topics[topic]:
+                data.add_item(msg, t)
 
         self.draw_done_sig.emit()
 

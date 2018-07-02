@@ -119,6 +119,7 @@ class ROSData(object):
         topic = self.name
         rospy.loginfo("Reading %s"%topic)
         topic_type, real_topic, fields = get_topic_type(topic, bag)
+        self.real_topic = real_topic
         if topic_type is not None:
             self.field_evals = generate_field_evals(fields)
             #data_class = roslib.message.get_message_class(topic_type)
@@ -135,6 +136,14 @@ class ROSData(object):
                 self.lock.release()
 
         rospy.loginfo("Done reading")
+
+    def add_item(self, msg, t):
+        try:
+            self.lock.acquire()
+            self.buff_y.append(self._get_data(msg))
+            self.buff_x.append(t.to_sec() - self.start_time)
+        finally:
+            self.lock.release()
 
     def _ros_cb(self, msg):
         """
