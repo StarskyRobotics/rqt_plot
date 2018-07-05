@@ -227,6 +227,8 @@ class PlotWidget(QWidget):
 
     def set_status(self, msg=""):
         self.subscribe_topic_button.setEnabled(msg == "")
+        self.redraw_button.setEnabled(msg == "")
+        self.load_button.setEnabled(msg == "")
         self.status_label.setText(msg)
 
 
