@@ -439,7 +439,11 @@ class PlotWidget(QWidget):
                 continue
             start, end = self.get_times()
             self._rosdata[topic_name] = ROSData(topic_name, self._start_time, start, end)
-            self.load_topic_data(topic_name)
+            if self.autodraw_checkbox.isChecked():
+                self.load_topic_data(topic_name)
+            else:
+                self._rosdata[topic_name].get_topic_info(self._bag)
+
             if self._rosdata[topic_name].error is not None:
                 qWarning(str(self._rosdata[topic_name].error))
                 del self._rosdata[topic_name]

@@ -115,19 +115,21 @@ class ROSData(object):
         pass
         #self.sub.unregister()
 
-    def load_data(self, bag):
-        topic = self.name
-        rospy.loginfo("Reading %s"%topic)
-        topic_type, real_topic, fields = get_topic_type(topic, bag)
-        self.real_topic = real_topic
-        if topic_type is not None:
-            self.field_evals = generate_field_evals(fields)
+    def get_topic_info(self, bag):
+        self.topic_type, self.real_topic, self.fields = get_topic_type(self.name, bag)
+        if self.topic_type is not None:
+            self.field_evals = generate_field_evals(self.fields)
             #data_class = roslib.message.get_message_class(topic_type)
             #self.sub = rospy.Subscriber(real_topic, data_class, self._ros_cb)
         else:
-            self.error = RosPlotException("Can not resolve topic type of %s" % topic)
+            self.error = RosPlotException("Can not resolve topic type of %s" % self.name)
 
-        for topic, msg, t in bag.read_messages(start_time=rospy.Time(self.start), end_time=rospy.Time(self.end), topics=[real_topic]):
+    def load_data(self, bag):
+        topic = self.name
+        rospy.loginfo("Reading %s"%topic)
+        self.get_topic_info(bag)
+
+        for topic, msg, t in bag.read_messages(start_time=rospy.Time(self.start), end_time=rospy.Time(self.end), topics=[self.real_topic]):
             try:
                 self.lock.acquire()
                 self.buff_y.append(self._get_data(msg))

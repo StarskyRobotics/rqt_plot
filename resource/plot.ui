@@ -96,6 +96,19 @@
       </widget>
      </item>
      <item>
+      <widget class="QCheckBox" name="autodraw_checkbox">
+       <property name="toolTip">
+        <string>Automatically draw topic from bag on add. Uncheck if you want to add multiple and then redraw in bulk.</string>
+       </property>
+       <property name="text">
+        <string>autodraw</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="spacer">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
@@ -136,6 +149,9 @@
      </item>
      <item>
       <widget class="QCheckBox" name="autoscale_checkbox">
+       <property name="toolTip">
+        <string>Automatically scales the Y axis to fit data</string>
+       </property>
        <property name="text">
         <string>autoscale</string>
        </property>
@@ -146,6 +162,9 @@
      </item>
      <item>
       <widget class="QCheckBox" name="autoscroll_checkbox">
+       <property name="toolTip">
+        <string>Automatically scrolls the X axis to the newest data</string>
+       </property>
        <property name="text">
         <string>autoscroll</string>
        </property>
@@ -163,7 +182,7 @@
         </sizepolicy>
        </property>
        <property name="toolTip">
-        <string>pause plot</string>
+        <string>Stop updating the graph</string>
        </property>
        <property name="iconSize">
         <size>
@@ -185,7 +204,7 @@
         </sizepolicy>
        </property>
        <property name="toolTip">
-        <string>clear plot</string>
+        <string>Clear the graph</string>
        </property>
        <property name="iconSize">
         <size>
@@ -223,6 +242,9 @@
      </item>
      <item>
       <widget class="QLineEdit" name="bag_edit">
+       <property name="toolTip">
+        <string>Path to the bag file</string>
+       </property>
        <property name="text">
         <string>/bags/selftest1.bag</string>
        </property>
@@ -241,6 +263,9 @@
          <width>80</width>
          <height>0</height>
         </size>
+       </property>
+       <property name="toolTip">
+        <string>Start time to plot from</string>
        </property>
        <property name="date">
         <date>
@@ -289,6 +314,9 @@
          <height>0</height>
         </size>
        </property>
+       <property name="toolTip">
+        <string>End time to plot to</string>
+       </property>
        <property name="displayFormat">
         <string>HH:mm:ss</string>
        </property>
@@ -320,6 +348,9 @@
          <height>0</height>
         </size>
        </property>
+       <property name="toolTip">
+        <string>Browse for a bag file</string>
+       </property>
        <property name="text">
         <string>Browse</string>
        </property>
@@ -333,6 +364,9 @@
          <height>16777215</height>
         </size>
        </property>
+       <property name="toolTip">
+        <string>Opens the bag file, does not actually draw anything</string>
+       </property>
        <property name="text">
         <string>Load</string>
        </property>
@@ -345,6 +379,9 @@
          <width>60</width>
          <height>16777215</height>
         </size>
+       </property>
+       <property name="toolTip">
+        <string>Redraw all added topics with the given time range</string>
        </property>
        <property name="text">
         <string>Redraw</string>
