@@ -2,6 +2,14 @@
 
 This is a modified version of rqt_plot that reads directly from a bag.
 
+Installation:
+* `git clone` this repo into your ros workspace/src/rqt_plotbag
+* `git checkout` the plotbag branch
+* `catkin build`
+* `source` ros workspace/devel/setup.bash
+* start a `roscore` if not already have one running on your laptop (I don't use it for anything, but rqt requires it still)
+* run `rqt_plotbag`
+
 Usage:
 1. Click 'Browse' (or paste a full path to a bag file)
 2. Click 'Load' to open the bag file
