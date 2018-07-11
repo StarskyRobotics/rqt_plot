@@ -187,6 +187,7 @@ class PlotWidget(QWidget):
 
     load_done_sig = pyqtSignal()
     draw_done_sig = pyqtSignal()
+    status_sig = pyqtSignal(str)
 
     def __init__(self, initial_topics=None, start_paused=False):
         super(PlotWidget, self).__init__()
@@ -221,15 +222,20 @@ class PlotWidget(QWidget):
 
         self.load_done_sig.connect(self.load_done)
         self.draw_done_sig.connect(self.draw_done)
+        self.status_sig.connect(self._set_status)
 
         self._bag = None
         self.set_status()
 
     def set_status(self, msg=""):
+        self.status_sig.emit(msg)
+
+    def _set_status(self, msg=""):
+        self.status_label.setText(msg)
+        if msg == "ERR": msg = ""
         self.subscribe_topic_button.setEnabled(msg == "")
         self.redraw_button.setEnabled(msg == "")
         self.load_button.setEnabled(msg == "")
-        self.status_label.setText(msg)
 
 
     def switch_data_plot_widget(self, data_plot):
@@ -347,13 +353,18 @@ class PlotWidget(QWidget):
 
     def _load(self):
         bagfile = self.bag_edit.text()
-        rospy.loginfo("Loading bag file %s" % bagfile)
-        self._bag = rosbag.Bag(bagfile)
-        rospy.loginfo("Bag loaded, reading topics")
-        self._bag.all_topics_types = [(k, v.msg_type) for k, v in self._bag.get_type_and_topic_info()[1].items()]
-        self._bag.all_topics = [k for k, v in self._bag.all_topics_types]
-        rospy.loginfo("Topics read")
-        self.load_done_sig.emit()
+        try:
+            rospy.loginfo("Loading bag file %s" % bagfile)
+            self._bag = rosbag.Bag(bagfile)
+            self.set_status("INDEXING")
+            rospy.loginfo("Bag loaded, indexing topics")
+            self._bag.all_topics_types = [(k, v.msg_type) for k, v in self._bag.get_type_and_topic_info()[1].items()]
+            self._bag.all_topics = [k for k, v in self._bag.all_topics_types]
+            rospy.loginfo("%d Topics indexed" % len(self._bag.all_topics))
+            self.load_done_sig.emit()
+        except Exception as e:
+            rospy.logerr("Unable to load bag! "+str(e))
+            self.set_status("ERR")
 
     def load_done(self):
         self.set_status("")
@@ -435,7 +446,12 @@ class PlotWidget(QWidget):
 
     def add_topic(self, topic_name):
         topics_changed = False
-        for topic_name in get_plot_fields(topic_name, self._bag)[0]:
+        fields = get_plot_fields(topic_name, self._bag)[0]
+        autodraw = self.autodraw_checkbox.isChecked()
+        if len(fields) > 1 and autodraw:
+            self.autodraw_checkbox.setChecked(False)
+
+        for topic_name in fields:
             if topic_name in self._rosdata:
                 qWarning('PlotWidget.add_topic(): topic already subscribed: %s' % topic_name)
                 continue
@@ -456,6 +472,10 @@ class PlotWidget(QWidget):
 
         if topics_changed:
             self._subscribed_topics_changed()
+
+        if len(fields) > 1 and autodraw:
+            self.autodraw_checkbox.setChecked(True)
+            self.on_redraw_button_clicked()
 
     def load_topic_data(self, topic_name):
         self.set_status("READING")
