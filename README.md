@@ -3,10 +3,10 @@
 This is a modified version of rqt_plot that reads directly from a bag.
 
 Installation:
-* `git clone` this repo into your ros workspace/src/rqt_plotbag
-* `git checkout` the plotbag branch
+* `git clone https://github.com/StarskyRobotics/rqt_plot.git` this repo into your ros_ws/src/rqt_plotbag
+* `git checkout plotbag`
 * `catkin build`
-* `source` ros workspace/devel/setup.bash
+* `source ~/ros_ws/devel/setup.bash`
 * start a `roscore` if not already have one running on your laptop (I don't use it for anything, but rqt requires it still)
 * run `rqt_plotbag`
 
