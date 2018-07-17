@@ -189,7 +189,7 @@ class PlotWidget(QWidget):
     draw_done_sig = pyqtSignal()
     status_sig = pyqtSignal(str)
 
-    def __init__(self, initial_topics=None, start_paused=False):
+    def __init__(self, initial_topics=None, initial_bag=None, start_paused=False):
         super(PlotWidget, self).__init__()
         self.setObjectName('PlotWidget')
 
@@ -227,6 +227,11 @@ class PlotWidget(QWidget):
         self._bag = None
         self.set_status()
 
+        if initial_bag is not None and len(initial_bag):
+            print("Loading initial bag from commandline")
+            self.bag_edit.setText(initial_bag)
+            self.on_load_button_clicked()
+
     def set_status(self, msg=""):
         self.status_sig.emit(msg)
 
@@ -257,10 +262,23 @@ class PlotWidget(QWidget):
         self.data_plot.dropEvent = self.dropEvent
         self.data_plot.dragEnterEvent = self.dragEnterEvent
 
+    def update_topics(self):
         if self._initial_topics:
+            print("Plotting initial topics from commandline")
+            autodraw = self.autodraw_checkbox.isChecked()
+            if len(self._initial_topics) > 1 and autodraw:
+                self.autodraw_checkbox.setChecked(False)
+
             for topic_name in self._initial_topics:
                 self.add_topic(topic_name)
+
+            if len(self._initial_topics) > 1 and autodraw:
+                self.autodraw_checkbox.setChecked(True)
+                self.on_redraw_button_clicked()
+
             self._initial_topics = None
+
+
         else:
             for topic_name, rosdata in self._rosdata.items():
                 data_x, data_y = rosdata.next()
@@ -371,6 +389,8 @@ class PlotWidget(QWidget):
         self.start_time_edit.setDateTime(QDateTime.fromMSecsSinceEpoch(self._bag.get_start_time() * 1000))
         self.end_time_edit.setDateTime(QDateTime.fromMSecsSinceEpoch(self._bag.get_end_time() * 1000))
         self._start_time = self.get_times()[0]
+
+        self.update_topics()
 
     @Slot()
     def on_redraw_button_clicked(self):

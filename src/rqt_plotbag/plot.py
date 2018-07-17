@@ -51,7 +51,7 @@ class Plotbag(Plugin):
         self._context = context
 
         self._args = self._parse_args(context.argv())
-        self._widget = PlotWidget(initial_topics=self._args.topics, start_paused=self._args.start_paused)
+        self._widget = PlotWidget(initial_topics=self._args.topics, initial_bag=self._args.bag)
         self._data_plot = DataPlot(self._widget)
 
         # disable autoscaling of X, and set a sane default range
@@ -104,10 +104,7 @@ class Plotbag(Plugin):
     @staticmethod
     def add_arguments(parser):
         group = parser.add_argument_group('Options for rqt_plotbag plugin')
-        group.add_argument('-P', '--pause', action='store_true', dest='start_paused',
-            help='Start in paused state')
-        group.add_argument('-e', '--empty', action='store_true', dest='start_empty',
-            help='Start without restoring previous topics')
+        group.add_argument('bag', nargs='?', help='bag file to load')
         group.add_argument('topics', nargs='*', default=[], help='Topics to plot')
 
     def _update_title(self):
