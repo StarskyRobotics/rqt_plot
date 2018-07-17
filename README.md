@@ -21,4 +21,9 @@ Tip:
 If you are plotting multiple topics, disable autodraw, add all the topics you want to plot, set the time range to the range you are interested in, then click redraw. 
 This will plot all the topics in parallel which is quicker then adding them one by one.
 
+Tip 2:
+You can quickly load a bag and plot topics from a commandline, call it like this:
+`rqt_plotbag /path/to/bagfile.bag /obd/speed /obd/accel /obd/brake /obd/torque`
+And it will load the bag file and immediately plot those topics over the entire bag.
+
 ![screenshot](https://raw.githubusercontent.com/StarskyRobotics/rqt_plot/plotbag/image.png)
