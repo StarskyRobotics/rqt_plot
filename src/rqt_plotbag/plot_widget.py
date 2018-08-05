@@ -364,6 +364,7 @@ class PlotWidget(QWidget):
 
     @Slot()
     def on_load_button_clicked(self):
+        self.clean_up_subscribers()
         thread = threading.Thread(target=self._load, args=())
         thread.daemon = True
         thread.start()
@@ -445,7 +446,8 @@ class PlotWidget(QWidget):
         if not self.pause_button.isChecked():
             # if pause button is not pressed, enable timer based on subscribed topics
             self.enable_timer(self._rosdata)
-        self.data_plot.redraw()
+        if self.data_plot is not None:
+            self.data_plot.redraw()
 
     def _update_remove_topic_menu(self):
         def make_remove_topic_function(x):
