@@ -434,6 +434,8 @@ class PlotWidget(QWidget):
                 try:
                     data_x, data_y = rosdata.next()
                     if data_x or data_y:
+                        while len(data_y) < len(data_x):
+                            data_y.append(0)
                         self.data_plot.update_values(topic_name, data_x, data_y)
                         needs_redraw = True
                 except RosPlotException as e:

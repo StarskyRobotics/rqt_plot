@@ -199,8 +199,10 @@ class ROSData(object):
                 #print(val)
             return float(val)
         except IndexError:
+            return 0
             self.error = RosPlotException("[%s] index error for: %s" % (self.name, str(val).replace('\n', ', ')))
         except TypeError:
+            return 0
             self.error = RosPlotException("[%s] value was not numeric: %s" % (self.name, val))
 
 
